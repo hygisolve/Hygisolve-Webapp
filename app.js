@@ -1095,7 +1095,7 @@ function renderRawMaterials() {
     stockView =
       `<div class="section-filter compact-filter"><div><b>Raw materials available</b><span>Current raw material stock and entry date filter</span></div>${dateRangeFields("rawMaterialFrom", "rawMaterialTo")}</div>` +
       tableCard("rawMaterials", rawRows, rawSchema) +
-      `<div class="section-filter packaging-filter compact-filter"><div><b>Packaging materials available</b><span>Current packaging stock and low stock status</span></div></div>` +
+      `<div class="section-filter packaging-filter compact-filter"><div><b>Packaging materials available</b><span>Current packaging stock and low stock status</span></div><div class="filter-actions"><button class="btn secondary small" onclick="exportPackagingStockCSV()">Export CSV</button></div></div>` +
       tableCard("packagingMaterials", packagingRows, packSchema),
     entryView =
       renderEntryRecords(entries, allRows) +
@@ -1442,10 +1442,10 @@ function packagingMaterialLabel(row, materials = DB.get("packagingMaterials")) {
     : "Deleted material";
 }
 function renderPackagingEntryRecords(rows, materials = DB.get("packagingMaterials")) {
-  return `<div class="section-filter packaging-entry-filter"><div><b>Packaging entry records</b><span>All packaging stock added within the selected period</span></div><div class="filter-actions">${dateRangeFields("packagingFrom", "packagingTo")}</div></div><div class="card table-card packaging-entry-records"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Material</th><th>Quantity Added</th><th>Entry Type</th><th>Remarks</th></tr></thead><tbody>${rows.length ? rows.map((row) => `<tr><td>${esc(row.date)}</td><td><b>${esc(packagingMaterialLabel(row, materials))}</b></td><td>${fmtNum(row.quantity)}</td><td>${badge(row.type || "Stock entry")}</td><td>${esc(row.remarks || "-")}</td></tr>`).join("") : '<tr><td colspan="5"><div class="empty">No packaging entry records found for this date range.</div></td></tr>'}</tbody></table></div></div>`;
+  return `<div class="section-filter packaging-entry-filter"><div><b>Packaging entry records</b><span>All packaging stock added within the selected period</span></div><div class="filter-actions">${dateRangeFields("packagingFrom", "packagingTo")}<button class="btn secondary small" onclick="exportPackagingEntryCSV()">Export CSV</button></div></div><div class="card table-card packaging-entry-records"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Material</th><th>Quantity Added</th><th>Entry Type</th><th>Remarks</th></tr></thead><tbody>${rows.length ? rows.map((row) => `<tr><td>${esc(row.date)}</td><td><b>${esc(packagingMaterialLabel(row, materials))}</b></td><td>${fmtNum(row.quantity)}</td><td>${badge(row.type || "Stock entry")}</td><td>${esc(row.remarks || "-")}</td></tr>`).join("") : '<tr><td colspan="5"><div class="empty">No packaging entry records found for this date range.</div></td></tr>'}</tbody></table></div></div>`;
 }
 function renderPackagingUsageRecords(rows, materials = DB.get("packagingMaterials")) {
-  return `<div class="section-filter packaging-usage-filter"><div><b>Packaging consumption records</b><span>Used and damaged packaging within the selected period</span></div><div class="filter-actions">${dateRangeFields("packagingUsageFrom", "packagingUsageTo")}</div></div><div class="card table-card packaging-usage-records"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Material</th><th>Used</th><th>Damaged</th><th>Total</th>${adminHTML("<th>Action</th>")}</tr></thead><tbody>${rows.length ? rows.map((row) => `<tr><td>${esc(row.date)}</td><td><b>${esc(packagingMaterialLabel(row, materials))}</b></td><td>${fmtNum(row.used)}</td><td>${fmtNum(row.damaged)}</td><td>${fmtNum(+row.used + +row.damaged)}</td>${adminHTML(`<td><button class="action-btn undo-consumption-btn" title="Undo usage" onclick="undoPackagingUsage('${row.id}')">Undo</button></td>`)}</tr>`).join("") : `<tr><td colspan="${canEdit() ? 6 : 5}"><div class="empty">No packaging consumption records found for this date range.</div></td></tr>`}</tbody></table></div></div>`;
+  return `<div class="section-filter packaging-usage-filter"><div><b>Packaging consumption records</b><span>Used and damaged packaging within the selected period</span></div><div class="filter-actions">${dateRangeFields("packagingUsageFrom", "packagingUsageTo")}<button class="btn secondary small" onclick="exportPackagingUsageCSV()">Export CSV</button></div></div><div class="card table-card packaging-usage-records"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Material</th><th>Used</th><th>Damaged</th><th>Total</th>${adminHTML("<th>Action</th>")}</tr></thead><tbody>${rows.length ? rows.map((row) => `<tr><td>${esc(row.date)}</td><td><b>${esc(packagingMaterialLabel(row, materials))}</b></td><td>${fmtNum(row.used)}</td><td>${fmtNum(row.damaged)}</td><td>${fmtNum(+row.used + +row.damaged)}</td>${adminHTML(`<td><button class="action-btn undo-consumption-btn" title="Undo usage" onclick="undoPackagingUsage('${row.id}')">Undo</button></td>`)}</tr>`).join("") : `<tr><td colspan="${canEdit() ? 6 : 5}"><div class="empty">No packaging consumption records found for this date range.</div></td></tr>`}</tbody></table></div></div>`;
 }
 function undoPackagingUsage(recordId) {
   if (!adminOnly()) return;
@@ -2113,6 +2113,99 @@ function exportConsumptionCSV() {
   );
   toast("Consumption CSV downloaded");
 }
+function exportPackagingStockCSV() {
+  const rows = DB.get("packagingMaterials").map((row) => ({
+    entryDate: row.entryDate || "",
+    code: row.code || "",
+    materialName: row.name || "",
+    type: row.type || "",
+    currentStock: +row.currentStock || 0,
+    minimumStock: +row.minStock || 0,
+    stockStatus:
+      (+row.currentStock || 0) <= (+row.minStock || 0)
+        ? "Low Stock"
+        : "In Stock",
+  }));
+  if (!rows.length) return toast("No packaging stock to export", "error");
+  const keys = Object.keys(rows[0]),
+    csv = [
+      keys.join(","),
+      ...rows.map((row) =>
+        keys.map((key) => csvText(row[key])).join(","),
+      ),
+    ].join("\n");
+  download(`packaging-materials-available-${dateISO()}.csv`, csv, "text/csv");
+  toast("Packaging materials CSV downloaded");
+}
+function exportPackagingEntryCSV() {
+  if (state.packagingFrom > state.packagingTo) {
+    toast("From date cannot be after To date", "error");
+    return;
+  }
+  ensurePackagingEntryRecords();
+  const materials = DB.get("packagingMaterials"),
+    rows = DB.get("packagingEntries")
+      .filter((row) => row.date >= state.packagingFrom && row.date <= state.packagingTo)
+      .map((row) => {
+        const material = materials.find((x) => x.id === row.materialId) || {};
+        return {
+          date: row.date,
+          materialCode: material.code || row.materialCode || "",
+          materialName: material.name || row.materialName || "Deleted material",
+          quantityAdded: +row.quantity || 0,
+          entryType: row.type || "Stock entry",
+          remarks: row.remarks || "",
+        };
+      });
+  if (!rows.length) return toast("No packaging entry records to export", "error");
+  const keys = Object.keys(rows[0]),
+    csv = [
+      keys.join(","),
+      ...rows.map((row) =>
+        keys.map((key) => csvText(row[key])).join(","),
+      ),
+    ].join("\n");
+  download(
+    `packaging-entry-records-${state.packagingFrom}-to-${state.packagingTo}.csv`,
+    csv,
+    "text/csv",
+  );
+  toast("Packaging entry CSV downloaded");
+}
+function exportPackagingUsageCSV() {
+  if (state.packagingUsageFrom > state.packagingUsageTo) {
+    toast("From date cannot be after To date", "error");
+    return;
+  }
+  const materials = DB.get("packagingMaterials"),
+    rows = DB.get("packagingUsage")
+      .filter((row) => row.date >= state.packagingUsageFrom && row.date <= state.packagingUsageTo)
+      .map((row) => {
+        const material = materials.find((x) => x.id === row.materialId) || {};
+        return {
+          date: row.date,
+          materialCode: material.code || "",
+          materialName: material.name || "Deleted material",
+          used: +row.used || 0,
+          damaged: +row.damaged || 0,
+          total: (+row.used || 0) + (+row.damaged || 0),
+        };
+      });
+  if (!rows.length) return toast("No packaging consumption records to export", "error");
+  const keys = Object.keys(rows[0]),
+    csv = [
+      keys.join(","),
+      ...rows.map((row) =>
+        keys.map((key) => csvText(row[key])).join(","),
+      ),
+    ].join("\n");
+  download(
+    `packaging-consumption-records-${state.packagingUsageFrom}-to-${state.packagingUsageTo}.csv`,
+    csv,
+    "text/csv",
+  );
+  toast("Packaging consumption CSV downloaded");
+}
 function exportExcel(collection) {
   if (!adminOnly()) return;
   const rows = DB.get(collection);
@@ -2159,6 +2252,9 @@ window.exportSalaryCSV = exportSalaryCSV;
 window.exportAttendanceRecordsCSV = exportAttendanceRecordsCSV;
 window.exportEntryCSV = exportEntryCSV;
 window.exportConsumptionCSV = exportConsumptionCSV;
+window.exportPackagingStockCSV = exportPackagingStockCSV;
+window.exportPackagingEntryCSV = exportPackagingEntryCSV;
+window.exportPackagingUsageCSV = exportPackagingUsageCSV;
 window.exportExcel = exportExcel;
 window.openTransaction = openTransaction;
 window.openStockIncrease = openStockIncrease;
