@@ -1546,7 +1546,7 @@ function salarySummary(empId, from = state.salaryFrom, to = state.salaryTo) {
     ot,
     overtimePayment,
     amount:
-      (present + half * 0.5 + leaves) * (+e.dailyWage || 0) +
+      (present + half * 0.5) * (+e.dailyWage || 0) +
       overtimePayment,
   };
 }
