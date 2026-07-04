@@ -415,6 +415,9 @@ const state = {
   attendanceDate: dateISO(),
   salaryFrom: dateISO(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
   salaryTo: dateISO(),
+  attendanceRecordFrom: dateISO(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+  attendanceRecordTo: dateISO(),
+  attendanceRecordEmployee: "",
   rawMaterialFrom: dateISO(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
   rawMaterialTo: dateISO(),
   consumptionFrom: dateISO(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
@@ -1119,6 +1122,10 @@ function setDateState(key, value, quiet = false) {
   state[key] = cleanDate(value);
   if (!quiet) render();
 }
+function setFilterState(key, value, quiet = false) {
+  state[key] = value || "";
+  if (!quiet) render();
+}
 function ensureRawMaterialEntryRecords() {
   const savedEntries = DB.get("rawMaterialEntries"),
     hadMissingId = savedEntries.some((entry) => !entry.id),
@@ -1497,7 +1504,8 @@ function renderAttendance() {
         return `<tr data-emp="${e.id}"><td><b>${esc(e.name)}</b><br><small>${e.employeeId}</small></td><td>${e.department}</td><td><div class="attendance-grid">${["Present", "Absent", "Half Day", "Leave", "Overtime"].map((x) => `<button class="attendance-btn ${a.status === x ? "selected" : ""}" data-status="${x}" onclick="pickAttendance(this)">${x}</button>`).join("")}</div></td><td><input class="input overtime" type="number" min="0" value="${a.overtime || 0}" style="width:90px"></td><td><input class="input overtimePayment" type="number" min="0" value="${a.overtimePayment || 0}" style="width:120px"></td><td>${money(salarySummary(e.id, state.attendanceDate, state.attendanceDate).amount)}</td></tr>`;
       })
       .join("")}</tbody></table></div></div>` +
-    renderSalarySummary();
+    renderSalarySummary() +
+    renderAttendanceRecords();
 }
 function pickAttendance(btn) {
   btn
@@ -1560,6 +1568,55 @@ function renderSalarySummary() {
       return `<tr><td>${esc(e.employeeId)}</td><td>${esc(e.name)}</td><td>${s.present}</td><td>${s.half}</td><td>${s.leaves}</td><td>${s.ot} hrs</td><td><b>${money(s.amount)}</b></td></tr>`;
     })
     .join("")}</tbody></table></div></div>`;
+}
+function attendanceDaySalary(record, employee) {
+  const dailyWage = +employee?.dailyWage || 0,
+    basePay =
+      record.status === "Present" || record.status === "Overtime"
+        ? dailyWage
+        : record.status === "Half Day"
+          ? dailyWage * 0.5
+          : 0;
+  return basePay + (+record.overtimePayment || 0);
+}
+function filteredAttendanceRecords() {
+  state.attendanceRecordFrom = cleanDate(state.attendanceRecordFrom);
+  state.attendanceRecordTo = cleanDate(state.attendanceRecordTo);
+  const employees = DB.get("employees"),
+    employeeMap = Object.fromEntries(employees.map((x) => [x.id, x]));
+  const records = DB.get("attendance")
+    .filter(
+      (x) =>
+        x.date >= state.attendanceRecordFrom &&
+        x.date <= state.attendanceRecordTo &&
+        (!state.attendanceRecordEmployee ||
+          x.employeeId === state.attendanceRecordEmployee),
+    )
+    .sort(
+      (a, b) =>
+        b.date.localeCompare(a.date) ||
+        cleanText(employeeMap[a.employeeId]?.name).localeCompare(
+          cleanText(employeeMap[b.employeeId]?.name),
+        ),
+    );
+  return { records, employees, employeeMap };
+}
+function renderAttendanceRecords() {
+  const { records, employees, employeeMap } = filteredAttendanceRecords(),
+    options = employees
+      .map(
+        (x) =>
+          `<option value="${esc(x.id)}" ${state.attendanceRecordEmployee === x.id ? "selected" : ""}>${esc(x.name)} (${esc(x.employeeId)})</option>`,
+      )
+      .join("");
+  return `<div class="card table-card"><div class="toolbar salary-toolbar"><div><b>Attendance records</b><div class="muted">All completed attendance entries with date and employee filter</div><div class="salary-date-filter"><label>From <input class="input" type="date" value="${esc(state.attendanceRecordFrom)}" onchange="setDateState('attendanceRecordFrom', this.value)"></label><label>To <input class="input" type="date" value="${esc(state.attendanceRecordTo)}" onchange="setDateState('attendanceRecordTo', this.value)"></label><label>Employee <select class="input" onchange="setFilterState('attendanceRecordEmployee', this.value)"><option value="">All employees</option>${options}</select></label></div></div><div><span class="badge blue">${records.length} records</span> <button class="btn secondary small" onclick="exportAttendanceRecordsCSV()">Export CSV</button></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee ID</th><th>Employee</th><th>Status</th><th>Overtime</th><th>Overtime Payment</th><th>Estimated Salary</th></tr></thead><tbody>${records.length
+    ? records
+        .map((record) => {
+          const employee = employeeMap[record.employeeId] || {};
+          return `<tr><td>${esc(record.date)}</td><td>${esc(employee.employeeId || "-")}</td><td>${esc(employee.name || "Unknown employee")}</td><td><span class="badge ${record.status === "Absent" ? "red" : record.status === "Leave" ? "blue" : record.status === "Half Day" ? "orange" : "green"}">${esc(record.status)}</span></td><td>${fmtNum(record.overtime)} hrs</td><td>${money(record.overtimePayment)}</td><td><b>${money(attendanceDaySalary(record, employee))}</b></td></tr>`;
+        })
+        .join("")
+    : `<tr><td colspan="7" class="empty">No attendance records found.</td></tr>`}</tbody></table></div></div>`;
 }
 
 function renderReports() {
@@ -1953,6 +2010,40 @@ function exportSalaryCSV() {
   );
   toast("Salary CSV downloaded");
 }
+function exportAttendanceRecordsCSV() {
+  if (state.attendanceRecordFrom > state.attendanceRecordTo) {
+    toast("From date cannot be after To date", "error");
+    return;
+  }
+  const { records, employeeMap } = filteredAttendanceRecords();
+  if (!records.length)
+    return toast("No attendance records to export", "error");
+  const rows = records.map((record) => {
+    const employee = employeeMap[record.employeeId] || {};
+    return {
+      date: record.date,
+      employeeId: employee.employeeId || "",
+      employeeName: employee.name || "Unknown employee",
+      status: record.status,
+      overtimeHours: +record.overtime || 0,
+      overtimePayment: (+record.overtimePayment || 0).toFixed(2),
+      estimatedSalary: attendanceDaySalary(record, employee).toFixed(2),
+    };
+  });
+  const keys = Object.keys(rows[0]);
+  const csv = [
+    keys.join(","),
+    ...rows.map((row) =>
+      keys.map((key) => csvText(row[key])).join(","),
+    ),
+  ].join("\n");
+  download(
+    `attendance-records-${state.attendanceRecordFrom}-to-${state.attendanceRecordTo}.csv`,
+    csv,
+    "text/csv",
+  );
+  toast("Attendance records CSV downloaded");
+}
 function exportEntryCSV() {
   if (state.rawMaterialFrom > state.rawMaterialTo) {
     toast("From date cannot be after To date", "error");
@@ -2065,6 +2156,7 @@ window.viewRecord = viewRecord;
 window.deleteRecord = deleteRecord;
 window.exportCSV = exportCSV;
 window.exportSalaryCSV = exportSalaryCSV;
+window.exportAttendanceRecordsCSV = exportAttendanceRecordsCSV;
 window.exportEntryCSV = exportEntryCSV;
 window.exportConsumptionCSV = exportConsumptionCSV;
 window.exportExcel = exportExcel;
@@ -2077,6 +2169,7 @@ window.undoPackagingUsage = undoPackagingUsage;
 window.pickAttendance = pickAttendance;
 window.saveAttendance = saveAttendance;
 window.setDateState = setDateState;
+window.setFilterState = setFilterState;
 window.closeModal = closeModal;
 window.exportBackup = exportBackup;
 window.resetData = resetData;
