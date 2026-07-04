@@ -1,0 +1,84 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#102a43">
+  <title>Hygisolve</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">HL</div>
+        <div><strong>Hygisolve</strong><span>Operations workspace</span></div>
+        <button class="icon-btn sidebar-close" id="sidebarClose" aria-label="Close menu">&times;</button>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="sidebar-footer">
+        <div class="plant-dot"></div>
+        <div><strong id="depotStatus">Depot is operational</strong><span id="depotStatusSub">Last sync: just now</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">&#9776;</button>
+        <div class="header-title"><span id="eyebrow">Operations overview</span><h1 id="pageTitle">Dashboard</h1></div>
+        <div class="top-search"><span>&#8981;</span><input id="globalSearch" placeholder="Search employees, materials, batches..."></div>
+        <button class="icon-btn notification-btn" id="notificationBtn" aria-label="Notifications">&#9671;<b id="notificationCount">0</b></button>
+        <button class="profile profile-button" id="profileButton" type="button" title="Switch depot or log out"><div class="avatar" id="profileAvatar">AM</div><div><strong id="profileName">Administrator</strong><span id="profileRole">Depot Administrator</span></div></button>
+      </header>
+      <section class="content" id="app"></section>
+    </main>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow" id="modalEyebrow">Record</span><h2 id="modalTitle">Add record</h2></div><button class="icon-btn" id="modalClose">&times;</button></div>
+      <form id="modalForm"><div class="form-grid" id="modalFields"></div><div class="modal-actions"><button type="button" class="btn secondary" id="modalCancel">Cancel</button><button type="submit" class="btn primary">Save record</button></div></form>
+    </div>
+  </div>
+  <div class="toast-wrap" id="toastWrap"></div>
+  <section class="login-screen" id="loginScreen" aria-label="Depot login">
+    <div class="login-panel">
+      <div class="login-brand"><div class="brand-mark">H</div><div><strong>Hygisolve</strong><span>Depot operations, beautifully organized</span></div></div>
+      <div class="auth-card">
+        <div id="signInView" class="hidden">
+          <div class="login-copy"><span class="eyebrow">Welcome back</span><h1>Enter your workspace</h1><p>Select a depot and sign in with your administrator account.</p></div>
+          <p class="login-notice" id="loginNotice"></p>
+          <form id="loginForm" class="login-form">
+            <div class="field"><label for="loginDepot">Your depot</label><select class="input" id="loginDepot" name="depot" required></select></div>
+            <div class="field"><label for="loginUsername">Username</label><input class="input" id="loginUsername" name="username" autocomplete="username" placeholder="Enter username" required></div>
+            <div class="field"><label for="loginPassword">Password</label><input class="input" id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required></div>
+            <p class="login-error" id="loginError" role="alert"></p>
+            <button class="btn primary login-submit" id="loginSubmit" type="submit">Sign in to depot</button>
+          </form>
+          <div class="auth-divider"><span>New location?</span></div>
+          <button class="btn create-depot-btn" id="showCreateDepot" type="button">+ Create a new depot</button>
+        </div>
+        <div id="createDepotView">
+          <button class="auth-back" id="cancelCreateDepot" type="button">&larr; Back to sign in</button>
+          <div class="login-copy"><span class="eyebrow">New workspace</span><h1>Create a depot</h1><p>Set up the location and its first administrator account.</p></div>
+          <form id="createDepotForm" class="login-form create-depot-form">
+            <div class="form-row"><div class="field"><label for="depotName">Depot name</label><input class="input" id="depotName" name="name" placeholder="e.g. Bengaluru Depot" required></div><div class="field"><label for="depotLocation">Location</label><input class="input" id="depotLocation" name="location" placeholder="City, State" required></div></div>
+            <div class="admin-section"><span>Administrator details</span></div>
+            <div class="field"><label for="adminName">Full name</label><input class="input" id="adminName" name="adminName" placeholder="Administrator's name" required></div>
+            <div class="form-row"><div class="field"><label for="adminUsername">Username</label><input class="input" id="adminUsername" name="username" autocomplete="off" placeholder="Create username" required></div><div class="field"><label for="adminRole">Role</label><input class="input" id="adminRole" name="role" value="Depot Administrator" required></div></div>
+            <div class="field"><label for="adminPassword">Password</label><input class="input" id="adminPassword" name="password" type="password" autocomplete="new-password" minlength="6" placeholder="At least 6 characters" required></div>
+            <p class="login-error" id="createDepotError" role="alert"></p>
+            <button class="btn primary login-submit" id="createDepotSubmit" type="submit">Create depot</button>
+          </form>
+        </div>
+      </div>
+      <p class="auth-footnote">Each depot keeps its inventory, employees and production records separate. Build 20260704-18</p>
+    </div>
+    <div class="login-art"><div><span>Built for growing operations</span><h2>Every depot in focus. Every workflow under control.</h2><div class="login-points"><b>Live inventory</b><b>Production tracking</b><b>Workforce records</b></div></div></div>
+  </section>
+  <script src="app.js?v=20260704-19"></script>
+</body>
+</html>
+
+
